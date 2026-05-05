@@ -1,0 +1,17 @@
+services:
+  - type: worker
+    name: trader-bot-bybit
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python traderbot/bot.py
+    envVars:
+      - key: EXCHANGE
+        value: BYBIT
+      - key: BYBIT_TESTNET
+        value: "false"
+      - key: BYBIT_CATEGORY
+        value: linear
+      - key: BYBIT_API_KEY
+        sync: false
+      - key: BYBIT_API_SECRET
+        sync: false
