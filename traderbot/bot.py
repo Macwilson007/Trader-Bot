@@ -1,9 +1,12 @@
+import os
 import time
 import logging
 import sys
+import threading
 from datetime import datetime, timedelta
 from threading import Lock
 import pytz
+from flask import Flask
 
 sys.path.append('.')
 from config import SYMBOLS, ACCOUNT_CONFIG, TRADING_SESSIONS, STRATEGY_CONFIG, SYMBOL_STRATEGIES, EXCHANGE
@@ -25,6 +28,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# Initialize Flask app for Render Free Tier Keep-Alive
+app = Flask(__name__)
+
+@app.route('/')
+def health_check():
+    return {"status": "alive", "timestamp": datetime.now().isoformat()}, 200
+
+def run_web_server():
+    # Render provides a PORT environment variable
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
 
 class TradingBot:
     def __init__(self):
@@ -283,6 +298,10 @@ class TradingBot:
 
 
 def main():
+    # Start web server in background thread
+    web_thread = threading.Thread(target=run_web_server, daemon=True)
+    web_thread.start()
+    
     bot = TradingBot()
     bot.start()
 
