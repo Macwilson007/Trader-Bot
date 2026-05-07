@@ -103,7 +103,7 @@ class RiskCalculator:
         self.risk_percent = STRATEGY_CONFIG["risk_percent"]
         self.pip_value = STRATEGY_CONFIG["pip_value"]
     
-    def calculate_lot_size(self, atr, sl_distance):
+    def calculate_lot_size(self, atr, sl_distance, symbol=None):
         risk_amount = self.balance * self.risk_percent
         
         if self.pip_value == 1.0: # Crypto Mode
@@ -113,9 +113,27 @@ class RiskCalculator:
             lot_size = risk_amount / sl_dollars
             
         if sl_distance <= 0:
-            return 0.01
+            return self._get_min_lot(symbol)
+        
+        # Use per-symbol min/max from config (supports micro accounts)
+        min_lot = self._get_min_lot(symbol)
+        max_lot = self._get_max_lot(symbol)
             
-        return max(min(lot_size, 1.0), 0.01)
+        return max(min(lot_size, max_lot), min_lot)
+    
+    def _get_min_lot(self, symbol):
+        """Get exchange minimum lot size for a symbol."""
+        from config import SYMBOLS
+        if symbol and symbol in SYMBOLS:
+            return SYMBOLS[symbol].get("min_lot", 0.001)
+        return 0.001
+    
+    def _get_max_lot(self, symbol):
+        """Get exchange maximum lot size for a symbol."""
+        from config import SYMBOLS
+        if symbol and symbol in SYMBOLS:
+            return SYMBOLS[symbol].get("max_lot", 100)
+        return 100
     
     def update_balance(self, new_balance):
         self.balance = new_balance

@@ -189,7 +189,14 @@ class TradingBot:
                 tp1_distance = levels["tp1"]
                 tp2_distance = levels["tp2"]
                 
-                lot_size = self.risk_calc.calculate_lot_size(atr, sl_distance)
+                lot_size = self.risk_calc.calculate_lot_size(atr, sl_distance, symbol=symbol)
+                
+                # Safety guard: skip if minimum lot risks more than 3x intended (e.g. $10 account on BTC)
+                actual_risk = lot_size * sl_distance
+                intended_risk = self.risk_calc.get_risk_amount()
+                if actual_risk > intended_risk * 3:
+                    logger.warning(f"{symbol}: Skipping - min lot risks ${actual_risk:.2f} vs intended ${intended_risk:.2f} (account too small)")
+                    continue
                 
                 if direction == "BUY":
                     sl = current_price - sl_distance
