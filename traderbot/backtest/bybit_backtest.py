@@ -149,4 +149,10 @@ class BybitBacktester:
 
 if __name__ == "__main__":
     backtester = BybitBacktester(initial_balance=1000.0)
-    backtester.run(days=40)
+    coins_to_test = [
+        "BTCUSDT", "ETHUSDT", "XRPUSDT", 
+        "SOLUSDT", "DOGEUSDT", "ADAUSDT", 
+        "BNBUSDT", "LINKUSDT", "DOTUSDT", 
+        "AVAXUSDT"
+    ]
+    backtester.run(symbols=coins_to_test, days=40)

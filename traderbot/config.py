@@ -32,15 +32,23 @@ ACCOUNT_CONFIG = {
 }
 
 SYMBOLS = {
-    "BTCUSDT": {"suffix": "", "pip_value": 0.1, "min_lot": 0.001, "max_lot": 100, "timeframe": "H1"},
-    "ETHUSDT": {"suffix": "", "pip_value": 0.01, "min_lot": 0.01, "max_lot": 1000, "timeframe": "H1"},
-    "XRPUSDT": {"suffix": "", "pip_value": 0.0001, "min_lot": 1.0, "max_lot": 100000, "timeframe": "H1"}
+    "BTCUSDT":  {"suffix": "", "pip_value": 0.1,    "min_lot": 0.001, "max_lot": 100,    "timeframe": "H1"},
+    "ETHUSDT":  {"suffix": "", "pip_value": 0.01,   "min_lot": 0.01,  "max_lot": 1000,   "timeframe": "H1"},
+    "XRPUSDT":  {"suffix": "", "pip_value": 0.0001, "min_lot": 1.0,   "max_lot": 100000, "timeframe": "H1"},
+    "BNBUSDT":  {"suffix": "", "pip_value": 0.01,   "min_lot": 0.01,  "max_lot": 1000,   "timeframe": "H1"},
+    "SOLUSDT":  {"suffix": "", "pip_value": 0.01,   "min_lot": 0.1,   "max_lot": 10000,  "timeframe": "H1"},
+    "DOGEUSDT": {"suffix": "", "pip_value": 0.0001, "min_lot": 1.0,   "max_lot": 100000, "timeframe": "H1"},
+    "ADAUSDT":  {"suffix": "", "pip_value": 0.0001, "min_lot": 1.0,   "max_lot": 100000, "timeframe": "H1"}
 }
 
 SYMBOL_STRATEGIES = {
-    "BTCUSDT": "math_risk_v3",
-    "ETHUSDT": "ema_crossover",
-    "XRPUSDT": "ema_crossover"
+    "BTCUSDT":  "rsi_divergence",   # 45.1% WR, PF 1.57, +$3.16/trade
+    "ETHUSDT":  "ema_crossover",    # 35.8% WR, PF 1.38, +$2.50/trade
+    "XRPUSDT":  "bb_squeeze",       # 35.6% WR, PF 1.09, +$0.58/trade
+    "BNBUSDT":  "bb_squeeze",       # 39.8% WR, PF 1.30, +$1.84/trade
+    "SOLUSDT":  "rsi_divergence",   # 41.1% WR, PF 1.31, +$2.01/trade
+    "DOGEUSDT": "rsi_divergence",   # 45.0% WR, PF 1.56, +$3.28/trade
+    "ADAUSDT":  "bb_squeeze",       # 35.1% WR, PF 1.06, +$0.41/trade
 }
 
 TRADING_SESSIONS = [

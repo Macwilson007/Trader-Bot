@@ -16,6 +16,8 @@ from core.session_manager import SessionManager
 from strategy.entry_signals import MathRiskV3Signals, RiskCalculator
 from strategy.rsi_strategy import RSIStrategy
 from strategy.ema_crossover import EMACrossoverStrategy
+from strategy.bb_squeeze import BBSqueezeStrategy
+from strategy.rsi_divergence import RSIDivergenceStrategy
 from execution.order_manager import OrderManager
 
 logging.basicConfig(
@@ -51,9 +53,11 @@ class TradingBot:
         self.order_manager = OrderManager(self.connector)
         
         self.strategies = {
-            "math_risk_v3": MathRiskV3Signals(),
-            "rsi": RSIStrategy(),
-            "ema_crossover": EMACrossoverStrategy()
+            "math_risk_v3":    MathRiskV3Signals(),
+            "rsi":             RSIStrategy(),
+            "ema_crossover":   EMACrossoverStrategy(),
+            "bb_squeeze":      BBSqueezeStrategy(),
+            "rsi_divergence":  RSIDivergenceStrategy(),
         }
         self.risk_calc = RiskCalculator(ACCOUNT_CONFIG["initial_balance"])
         
@@ -162,7 +166,7 @@ class TradingBot:
                 strategy = self.strategies.get(strategy_key, self.strategies["math_risk_v3"])
                 
                 tf_name = SYMBOLS[symbol].get("timeframe", "H1")
-                tf_val = self.tf_map.get(tf_name, mt5.TIMEFRAME_H1)
+                tf_val = self.tf_map.get(tf_name, "H1")
                 
                 h1_data = self.connector.get_historical_data(
                     full_symbol,
