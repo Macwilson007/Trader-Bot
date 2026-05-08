@@ -33,10 +33,127 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask app for Render Free Tier Keep-Alive
 app = Flask(__name__)
+_bot_instance = None  # Set when bot starts
 
 @app.route('/')
 def health_check():
     return {"status": "alive", "timestamp": datetime.now().isoformat()}, 200
+
+@app.route('/api/status')
+def api_status():
+    if not _bot_instance:
+        return {"error": "Bot not started"}, 503
+    bot = _bot_instance
+    balance = bot.connector.get_balance() if bot.connector.connected else 0
+    positions = bot.order_manager.get_open_positions() if bot.connector.connected else []
+    cb_active = bot.hard_lock_until is not None and datetime.now(pytz.timezone('GMT')) < bot.hard_lock_until
+    return {
+        "balance": balance,
+        "initial_balance": bot.initial_balance,
+        "daily_pnl": round(bot.daily_pnl, 2),
+        "open_positions": len(positions) if isinstance(positions, list) else 0,
+        "circuit_breaker": cb_active,
+        "symbols": bot.base_symbols,
+        "strategies": {s: SYMBOL_STRATEGIES.get(s) for s in bot.base_symbols},
+        "total_trades_today": len([t for t in bot.trade_history if t.get('date') == datetime.now(pytz.timezone('GMT')).strftime('%Y-%m-%d')]),
+        "uptime": str(datetime.now(pytz.timezone('GMT')) - bot.start_time) if hasattr(bot, 'start_time') else "unknown",
+    }, 200
+
+@app.route('/api/trades')
+def api_trades():
+    if not _bot_instance:
+        return {"error": "Bot not started"}, 503
+    return {"trades": _bot_instance.trade_history[-50:]}, 200  # Last 50
+
+@app.route('/dashboard')
+def dashboard():
+    return DASHBOARD_HTML, 200
+
+DASHBOARD_HTML = '''
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraderBot Dashboard</title>
+<style>
+:root { --bg:#0f1117; --sf:#1a1d27; --bd:#2a2d3a; --tx:#e4e4e7; --mt:#71717a;
+  --pos:#22c55e; --neg:#ef4444; --acc:#818cf8; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:"Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--tx); padding:1.5rem; }
+h1 { font-size:1.5rem; margin-bottom:.5rem; }
+.sub { color:var(--mt); font-size:.85rem; margin-bottom:1.5rem; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:.75rem; margin-bottom:1.5rem; }
+.card { background:var(--sf); border:1px solid var(--bd); border-radius:10px; padding:1rem; }
+.card .label { color:var(--mt); font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; }
+.card .val { font-size:1.5rem; font-weight:700; margin-top:.25rem; }
+.pos { color:var(--pos); } .neg { color:var(--neg); }
+.status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; }
+.dot-live { background:var(--pos); box-shadow:0 0 6px var(--pos); }
+.dot-off { background:var(--neg); }
+table { width:100%; border-collapse:collapse; margin-top:1rem; }
+th { background:var(--sf); color:var(--mt); text-transform:uppercase; font-size:.7rem;
+  padding:.6rem .8rem; text-align:left; border-bottom:2px solid var(--bd); }
+td { padding:.5rem .8rem; border-bottom:1px solid var(--bd); font-size:.85rem; }
+tr:hover { background:#ffffff06; }
+.pill { font-size:.65rem; padding:2px 8px; border-radius:4px; font-weight:600; }
+.pill-buy { background:#22c55e22; color:var(--pos); }
+.pill-sell { background:#ef444422; color:var(--neg); }
+.refresh { color:var(--mt); font-size:.75rem; margin-top:1rem; }
+#coins-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.5rem; margin-bottom:1.5rem; }
+.coin-card { background:var(--sf); border:1px solid var(--bd); border-radius:8px; padding:.75rem 1rem;
+  display:flex; justify-content:space-between; align-items:center; }
+.coin-name { font-weight:600; }
+.coin-strat { color:var(--acc); font-size:.75rem; }
+</style>
+</head><body>
+<h1><span class="status-dot dot-live" id="dot"></span> TraderBot Live Dashboard</h1>
+<p class="sub" id="uptime">Loading...</p>
+
+<div class="grid" id="kpis"></div>
+<h3 style="margin-bottom:.5rem">Coin Assignments</h3>
+<div id="coins-grid"></div>
+<h3>Recent Trades</h3>
+<table><thead><tr><th>Time</th><th>Coin</th><th>Side</th><th>Strategy</th><th>Lot</th><th>Entry</th><th>SL</th><th>TP</th></tr></thead>
+<tbody id="trades"></tbody></table>
+<p class="refresh">Auto-refreshes every 30s</p>
+
+<script>
+async function refresh() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    const t = await (await fetch("/api/trades")).json();
+    document.getElementById("dot").className = "status-dot dot-live";
+    document.getElementById("uptime").textContent = "Uptime: " + s.uptime + " | " + new Date().toLocaleString();
+    const pnlClass = s.daily_pnl >= 0 ? "pos" : "neg";
+    const balPct = ((s.balance - s.initial_balance) / s.initial_balance * 100).toFixed(2);
+    document.getElementById("kpis").innerHTML = `
+      <div class="card"><div class="label">Balance</div><div class="val">$${s.balance.toLocaleString(undefined,{minimumFractionDigits:2})}</div></div>
+      <div class="card"><div class="label">All-Time P&L</div><div class="val ${pnlClass}">$${(s.balance-s.initial_balance).toFixed(2)} (${balPct}%)</div></div>
+      <div class="card"><div class="label">Daily P&L</div><div class="val ${pnlClass}">$${s.daily_pnl.toFixed(2)}</div></div>
+      <div class="card"><div class="label">Open Positions</div><div class="val">${s.open_positions}</div></div>
+      <div class="card"><div class="label">Trades Today</div><div class="val">${s.total_trades_today}</div></div>
+      <div class="card"><div class="label">Circuit Breaker</div><div class="val">${s.circuit_breaker ? "ACTIVE" : "OK"}</div></div>
+    `;
+    let coinsHtml = "";
+    for (const [coin, strat] of Object.entries(s.strategies)) {
+      coinsHtml += `<div class="coin-card"><span class="coin-name">${coin}</span><span class="coin-strat">${strat}</span></div>`;
+    }
+    document.getElementById("coins-grid").innerHTML = coinsHtml;
+    let rows = "";
+    for (const tr of (t.trades || []).reverse()) {
+      const cls = tr.direction === "BUY" ? "pill-buy" : "pill-sell";
+      rows += `<tr><td>${tr.time || "-"}</td><td>${tr.symbol}</td>
+        <td><span class="pill ${cls}">${tr.direction}</span></td>
+        <td>${tr.strategy || "-"}</td><td>${tr.lot || "-"}</td>
+        <td>${tr.entry || "-"}</td><td>${tr.sl || "-"}</td><td>${tr.tp || "-"}</td></tr>`;
+    }
+    document.getElementById("trades").innerHTML = rows || "<tr><td colspan=8 style=\"color:var(--mt);text-align:center\">No trades yet</td></tr>";
+  } catch(e) {
+    document.getElementById("dot").className = "status-dot dot-off";
+  }
+}
+refresh(); setInterval(refresh, 30000);
+</script>
+</body></html>
+'''
 
 def run_web_server():
     # Render provides a PORT environment variable
@@ -229,6 +346,18 @@ class TradingBot:
                         "direction": direction,
                         "atr": atr
                     }
+                    # Log trade for dashboard
+                    self.trade_history.append({
+                        "time": datetime.now(pytz.timezone('GMT')).strftime('%Y-%m-%d %H:%M'),
+                        "date": datetime.now(pytz.timezone('GMT')).strftime('%Y-%m-%d'),
+                        "symbol": symbol,
+                        "direction": direction,
+                        "strategy": strategy_key,
+                        "lot": f"{lot_size:.4f}",
+                        "entry": f"{current_price:.4f}",
+                        "sl": f"{sl:.4f}",
+                        "tp": f"{tp2:.4f}",
+                    })
                     logger.info(f"✓ {direction} {symbol} | Lot:{lot_size:.3f} | SL:{sl:.2f} | TP1:{tp1:.2f} | TP2:{tp2:.2f} | ATRx:{atr_ratio:.1f}")
                 else:
                     logger.warning(f"✗ Failed to open {symbol}")
@@ -309,11 +438,15 @@ class TradingBot:
 
 
 def main():
+    global _bot_instance
+    
     # Start web server in background thread
     web_thread = threading.Thread(target=run_web_server, daemon=True)
     web_thread.start()
     
     bot = TradingBot()
+    bot.start_time = datetime.now(pytz.timezone('GMT'))
+    _bot_instance = bot  # Expose to Flask routes
     bot.start()
 
 
