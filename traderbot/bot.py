@@ -224,9 +224,19 @@ class TradingBot:
         logger.info("TRADERBOT v2.0 - Mathematical Risk Engine v3")
         logger.info("=" * 60)
         
-        if not self.connector.connect():
-            logger.error(f"Failed to connect to {EXCHANGE}")
-            return
+        # Retry connection with backoff (don't die on Render)
+        max_retries = 10
+        for attempt in range(1, max_retries + 1):
+            if self.connector.connect():
+                break
+            wait = min(30 * attempt, 300)  # 30s, 60s, 90s... max 5min
+            logger.warning(f"Connection attempt {attempt}/{max_retries} failed. Retrying in {wait}s...")
+            time.sleep(wait)
+        else:
+            logger.error(f"Failed to connect to {EXCHANGE} after {max_retries} attempts. Running in dashboard-only mode.")
+            # Keep running so the Flask dashboard stays alive on Render
+            while True:
+                time.sleep(60)
         
         account_balance = self.connector.get_balance()
         if account_balance:
