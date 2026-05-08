@@ -10,7 +10,10 @@ from flask import Flask
 
 sys.path.append('.')
 from config import SYMBOLS, ACCOUNT_CONFIG, TRADING_SESSIONS, STRATEGY_CONFIG, SYMBOL_STRATEGIES, EXCHANGE
-from connector.mt5_connector import MT5Connector
+try:
+    from connector.mt5_connector import MT5Connector
+except ImportError:
+    MT5Connector = None  # Not available on Linux (Render)
 from connector.bybit_connector import BybitConnector
 from core.session_manager import SessionManager
 from strategy.entry_signals import MathRiskV3Signals, RiskCalculator
@@ -19,6 +22,8 @@ from strategy.ema_crossover import EMACrossoverStrategy
 from strategy.bb_squeeze import BBSqueezeStrategy
 from strategy.rsi_divergence import RSIDivergenceStrategy
 from execution.order_manager import OrderManager
+
+os.makedirs('logs', exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,
