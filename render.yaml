@@ -3,7 +3,7 @@ services:
     name: trader-bot-bybit
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python traderbot/bot.py
+    startCommand: gunicorn traderbot.bot:app --bind 0.0.0.0:$PORT --log-level info
     envVars:
       - key: EXCHANGE
         value: BYBIT

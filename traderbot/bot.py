@@ -6,9 +6,13 @@ import threading
 from datetime import datetime, timedelta
 from threading import Lock
 import pytz
-from flask import Flask
+from flask import Flask, redirect
 
-sys.path.append('.')
+# Ensure traderbot directory is in sys.path so 'from config import ...' works reliably
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 from config import SYMBOLS, ACCOUNT_CONFIG, TRADING_SESSIONS, STRATEGY_CONFIG, SYMBOL_STRATEGIES, EXCHANGE
 try:
     from connector.mt5_connector import MT5Connector
@@ -41,6 +45,10 @@ app = Flask(__name__)
 _bot_instance = None  # Set when bot starts
 
 @app.route('/')
+def index():
+    return redirect('/dashboard')
+
+@app.route('/health')
 def health_check():
     return {"status": "alive", "timestamp": datetime.now().isoformat()}, 200
 
@@ -452,18 +460,25 @@ class TradingBot:
         }
 
 
-def main():
+def start_background_bot():
     global _bot_instance
-    
-    # Start web server in background thread
-    web_thread = threading.Thread(target=run_web_server, daemon=True)
-    web_thread.start()
-    
-    bot = TradingBot()
-    bot.start_time = datetime.now(pytz.timezone('GMT'))
-    _bot_instance = bot  # Expose to Flask routes
-    bot.start()
+    try:
+        logger.info("Starting background bot thread...")
+        bot = TradingBot()
+        bot.start_time = datetime.now(pytz.timezone('GMT'))
+        _bot_instance = bot
+        bot.start()
+    except Exception as e:
+        logger.error(f"Failed to start background bot: {e}")
 
+# Automatically start the bot thread when the module is loaded (e.g. by Gunicorn)
+bot_thread = threading.Thread(target=start_background_bot, daemon=True)
+bot_thread.start()
+
+def main():
+    # Render provides a PORT environment variable
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
 
 if __name__ == "__main__":
     main()
