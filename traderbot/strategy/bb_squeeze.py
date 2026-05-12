@@ -10,7 +10,7 @@ import numpy as np
 
 class BBSqueezeStrategy:
     def __init__(self, bb_period=20, bb_std=2.0, squeeze_lookback=20,
-                 vol_mult=1.5, atr_period=14, atr_sl=1.5, atr_tp=3.0):
+                 vol_mult=1.2, atr_period=14, atr_sl=2.0, atr_tp=5.0):
         self.bb_period = bb_period
         self.bb_std = bb_std
         self.squeeze_lookback = squeeze_lookback

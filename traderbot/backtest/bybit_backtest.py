@@ -12,9 +12,8 @@ from traderbot.connector.bybit_connector import BybitConnector
 from traderbot.strategy.entry_signals import MathRiskV3Signals
 from traderbot.strategy.rsi_strategy import RSIStrategy
 from traderbot.strategy.ema_crossover import EMACrossoverStrategy
-import config
-import inspect
-print(f"[DEBUG] Loading config from: {os.path.abspath(inspect.getfile(config))}")
+from traderbot.strategy.rsi_divergence import RSIDivergenceStrategy
+from traderbot.strategy.bb_squeeze import BBSqueezeStrategy
 from config import SYMBOLS, SYMBOL_STRATEGIES
 
 class BybitBacktester:
@@ -24,7 +23,9 @@ class BybitBacktester:
         self.strategies = {
             "math_risk_v3": MathRiskV3Signals(),
             "rsi": RSIStrategy(),
-            "ema_crossover": EMACrossoverStrategy()
+            "ema_crossover": EMACrossoverStrategy(),
+            "rsi_divergence": RSIDivergenceStrategy(),
+            "bb_squeeze": BBSqueezeStrategy()
         }
 
     def run(self, symbols=None, days=30):
@@ -32,16 +33,13 @@ class BybitBacktester:
             print("Failed to connect to Bybit for data.")
             return
 
-        print(f"[DEBUG] Raw SYMBOLS keys: {list(SYMBOLS.keys())}")
         test_symbols = symbols if symbols else list(SYMBOLS.keys())
-        print(f"[DEBUG] Pre-filter Watchlist: {test_symbols}")
         test_symbols = [s for s in test_symbols if "USDT" in s]
-        
-        print(f"Watchlist: {test_symbols}")
         
         print("="*60)
         print(f"BYBIT CRYPTO BACKTEST - Last {days} Days")
         print(f"Initial Balance: ${self.initial_balance:,.2f}")
+        print(f"Watchlist: {test_symbols}")
         print("="*60)
 
         for symbol in test_symbols:
@@ -50,13 +48,13 @@ class BybitBacktester:
             df = self.connector.get_historical_data(symbol, "60", count=days*24)
             
             if df is None:
-                print(f"  [DEBUG] Failed to fetch data for {symbol}")
+                print(f"  Failed to fetch data for {symbol}")
                 continue
             if len(df) < 100:
-                print(f"  [DEBUG] Insufficient data for {symbol} (Found {len(df)} bars)")
+                print(f"  Insufficient data for {symbol} ({len(df)} bars)")
                 continue
             
-            print(f"  [DEBUG] Data loaded: {len(df)} bars found.")
+            print(f"  Data loaded: {len(df)} bars")
 
             strategy_key = SYMBOL_STRATEGIES.get(symbol, "math_risk_v3")
             strategy = self.strategies.get(strategy_key)
